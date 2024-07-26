@@ -12,16 +12,14 @@ import SearchPage from "./pages/SearchPage";
 import SearchHistoryPage from "./pages/SearchHistoryPage";
 import NotFoundPage from "./pages/404";
 
+import Chatbot from "./components/Chatbot";
+
 function App() {
   const { user, isCheckingAuth, authCheck } = useAuthStore();
 
   useEffect(() => {
     if (!isCheckingAuth) {
-      console.log("user", user);
-
       authCheck();
-    } else {
-      console.log("isCheckingAuth", isCheckingAuth);
     }
   }, [authCheck]);
 
@@ -64,6 +62,8 @@ function App() {
       <Footer />
 
       <Toaster />
+
+      <Chatbot />
     </>
   );
 }
