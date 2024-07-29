@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@babel/runtime": "^7.25.0",
     "axios": "^1.7.2",
     "cinemate": "file:..",
     "core-js": "^3.37.1",
