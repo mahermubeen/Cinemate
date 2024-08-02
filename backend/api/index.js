@@ -18,6 +18,15 @@ const PORT = ENV_VARS.PORT || 3000;
 
 const __dirname = path.resolve();
 
+const cors = require("cors");
+
+const corsOptions = {
+  origin: "https://cinemate101.netlify.app", // Replace with your actual Netlify site URL
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
 app.use(cookieParser());
 
