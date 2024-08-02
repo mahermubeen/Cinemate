@@ -1,0 +1,9 @@
+{
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/$1",
+      "proxy": "https://cinemate-eta.vercel.app"
+    }
+  ]
+}
