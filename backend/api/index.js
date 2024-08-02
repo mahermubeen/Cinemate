@@ -2,15 +2,15 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import path from "path";
 
-import botRoutes from "./routes/chatbot.route.js";
-import authRoutes from "./routes/auth.route.js";
-import movieRoutes from "./routes/movie.route.js";
-import tvRoutes from "./routes/tv.route.js";
-import searchRoutes from "./routes/search.route.js";
+import botRoutes from "../routes/chatbot.route.js";
+import authRoutes from "../routes/auth.route.js";
+import movieRoutes from "../routes/movie.route.js";
+import tvRoutes from "../routes/tv.route.js";
+import searchRoutes from "../routes/search.route.js";
 
-import { ENV_VARS } from "./config/envVars.js";
-import { connectDB } from "./config/db.js";
-import { protectRoute } from "./middleware/protectRoute.js";
+import { ENV_VARS } from "../config/envVars.js";
+import { connectDB } from "../config/db.js";
+import { protectRoute } from "../middleware/protectRoute.js";
 
 const app = express();
 
