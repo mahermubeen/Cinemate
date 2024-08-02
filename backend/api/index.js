@@ -24,7 +24,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions)); // Use CORS middleware
 
-const PORT = ENV_VARS.PORT;
+const PORT = ENV_VARS.PORT || 3000;
+
 const __dirname = path.resolve();
 
 app.use(express.json()); // Allow parsing of req.body

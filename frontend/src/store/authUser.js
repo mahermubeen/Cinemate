@@ -22,16 +22,11 @@ export const useAuthStore = create((set) => ({
   login: async (credentials) => {
     set({ isLoggingIn: true });
     try {
-      // Use the full URL for the API request
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/login`,
-        credentials
-      );
+      const response = await axios.post("/api/v1/auth/login", credentials);
       set({ user: response.data.user, isLoggingIn: false });
     } catch (error) {
       set({ isLoggingIn: false, user: null });
-      // Handle error messages appropriately
-      toast.error(error.response?.data?.message || "Login failed");
+      toast.error(error.response.data.message || "Login failed");
     }
   },
   logout: async () => {
