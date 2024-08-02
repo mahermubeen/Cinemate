@@ -1,18 +1,52 @@
 import { useState, useEffect, useRef } from "react";
 import { useBotStore } from "../store/chatbot";
-
+import axios from "axios";
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
+import toast from "react-hot-toast";
 
 const Chatbot = () => {
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [chatboxOpen, setChatboxOpen] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const endOfMessagesRef = useRef(null);
 
+  const [message, setMessage] = useState("");
+  const [chatboxOpen, setChatboxOpen] = useState(false);
+  const [responseMode, setResponseMode] = useState("text"); // "text" or "audio"
+  const [chatHistory, setChatHistory] = useState([]); // Array to store chat messages
+  const [voiceGender, setVoiceGender] = useState("male"); // Array to store chat messages
   const chatboxRef = useRef(null); // Reference to the chatbox element
-  const { isLoading, chatBot } = useBotStore();
+
+  useEffect(() => {
+    // Scroll to the bottom of the chat history whenever chatHistory changes
+    endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
+
+  const models = [
+    "GPT-2 Medium",
+    "GPT-2 Large",
+    "GPT-2 XL",
+    "GPT-3.5 Turbo",
+    "GPT-Neo 1.3B",
+    "GPT-Neo 2.7B",
+    "GPT-J 6B",
+    "GPT-3",
+    "BERT Base",
+    "BERT Large",
+    "RoBERTa Base",
+    "RoBERTa Large",
+    "DistilBERT",
+    "T5 Base",
+    "T5 Large",
+    "T5 XL",
+    "BLOOM-560M",
+    "BLOOM-1B",
+    "BLOOM-3B",
+    "BLOOM-7B",
+    "BLOOM-175B",
+  ];
+  const [selectedModel, setSelectedModel] = useState(models[0]);
 
   // Speech recognition hook
   const {
@@ -23,6 +57,31 @@ const Chatbot = () => {
   } = useSpeechRecognition();
 
   useEffect(() => {
+    const checkModelStatus = async () => {
+      try {
+        const response = await axios.get("/api/v1/modelStatus");
+        console.log("model status: ", response.data.ready);
+
+        if (response.data.ready) {
+          setIsLoading(false);
+          clearInterval(interval);
+        } else {
+          setIsLoading(true);
+        }
+      } catch (error) {
+        console.error("Error fetching model status:", error);
+      }
+    };
+
+    checkModelStatus(); // Initial check
+
+    const interval = setInterval(checkModelStatus, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval); // Clean up interval on component unmount
+  }, []);
+
+  // Update message with transcript when speaking
+  useEffect(() => {
     if (transcript) {
       setMessage(transcript);
     }
@@ -30,15 +89,17 @@ const Chatbot = () => {
 
   // Handle sending message after speech ends
   useEffect(() => {
-    if (!listening && message.trim() !== "" && !isTyping) {
+    if (!listening) {
+      // Only send if the message is not typed
       const sendTimeout = setTimeout(() => {
         handleSendMessage();
       }, 1000); // Delay to ensure user has stopped speaking
 
       return () => clearTimeout(sendTimeout);
     }
-  }, [listening, message, isTyping]);
+  }, [listening]);
 
+  // Close chatbox on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (chatboxRef.current && !chatboxRef.current.contains(event.target)) {
@@ -52,16 +113,66 @@ const Chatbot = () => {
     };
   }, []);
 
-  const handleSendMessage = (e) => {
+  const toggleResponseMode = () => {
+    setResponseMode(responseMode === "text" ? "audio" : "text");
+  };
+
+  const speakText = (text) => {
+    const speechSynthesis = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = speechSynthesis
+      .getVoices()
+      .find((voice) =>
+        voice.name.toLowerCase().includes(voiceGender.toLowerCase())
+      );
+
+    speechSynthesis.speak(utterance);
+  };
+
+  const handleSendMessage = async (e) => {
     if (e) e.preventDefault(); // Prevent form submission if triggered by form submit
     if (message.trim() === "") return; // Don't send empty messages
 
+    // Add user message to chat history
+    setChatHistory((prevHistory) => [
+      ...prevHistory,
+      { type: "user", text: message },
+    ]);
+
     setLoading(true);
-    chatBot({ message }).finally(() => {
+
+    try {
+      // Get the chatBotApi function from the Zustand store
+      const { chatBotApi } = useBotStore.getState();
+
+      // Send message to API
+      await chatBotApi({ message, model: selectedModel });
+
+      // Get the updated response from the store
+      const { res: botResponse } = useBotStore.getState();
+
+      // Check if the botResponse is defined
+      if (botResponse) {
+        // Add AI response to chat history
+        setChatHistory((prevHistory) => [
+          ...prevHistory,
+          { type: "bot", text: botResponse },
+        ]);
+
+        if (responseMode === "audio") {
+          // Convert the response text to speech
+          speakText(botResponse);
+        }
+      } else {
+        console.error("Bot response is undefined");
+      }
+    } catch (error) {
+      toast.error("Failed to get response from the chatbot");
+    } finally {
       setLoading(false);
       resetTranscript(); // Clear the transcript after sending
       setMessage(""); // Clear the message input field
-    });
+    }
   };
 
   const toggleChatbox = () => {
@@ -83,7 +194,7 @@ const Chatbot = () => {
   return (
     <div>
       <button
-        className="fixed bottom-4 right-4 inline-flex items-center justify-center text-sm font-medium disabled:pointer-events-none disabled:opacity-50 border rounded-full w-16 h-16 bg-black hover:bg-gray-700 m-0 cursor-pointer border-gray-200 bg-none p-0 normal-case leading-5 hover:text-gray-900"
+        className="fixed z-20 bottom-4 right-4 inline-flex items-center justify-center text-sm font-medium disabled:pointer-events-none disabled:opacity-50 border rounded-full w-16 h-16 bg-black hover:bg-gray-700 m-0 cursor-pointer border-gray-200 bg-none p-0 normal-case leading-5 hover:text-gray-900"
         type="button"
         aria-haspopup="dialog"
         aria-expanded={chatboxOpen}
@@ -114,137 +225,208 @@ const Chatbot = () => {
           style={{
             boxShadow: "0 0 #0000, 0 0 #0000, 0 1px 2px 0 rgb(0 0 0 / 0.05)",
           }}
-          className="fixed bottom-[calc(4rem+1.5rem)] right-0 mr-4 bg-white p-6 rounded-lg border border-[#e5e7eb] w-[440px] h-[634px]"
+          className="fixed z-20 bottom-[calc(4rem+1.5rem)] right-0 mr-4 bg-white p-6 rounded-lg border border-[#e5e7eb] w-[440px] h-[634px]"
         >
           {/* Heading */}
-          <div className="flex flex-col space-y-1.5 pb-6">
+          <div className="flex flex-col space-y-1.5">
             <h2 className="font-semibold text-lg tracking-tight">CINEBOT</h2>
-            <p className="text-sm text-[#6b7280] leading-3">
-              Powered by OpenAi (GPT 3.5 Turbo)
+            <p className="text-sm text-[#6b7280]">
+              Powered by HuggingFace
+              <br /> Model ({selectedModel})
             </p>
           </div>
 
           {/* Chat Container */}
           <div
-            className="pr-4 h-[474px]"
-            style={{ minWidth: "100%", display: "table" }}
+            className="pr-4 h-[414px] max-h-[414px] mb-[60px] overflow-y-auto scrollbar-ok"
+            style={{ minWidth: "100%" }}
           >
-            {/* Chat Message AI */}
-            <div className="flex gap-3 my-4 text-gray-600 text-sm flex-1">
-              <span className="relative flex shrink-0 overflow-hidden rounded-full w-8 h-8">
-                <div className="rounded-full bg-gray-100 border p-1">
-                  <svg
-                    stroke="none"
-                    fill="black"
-                    strokeWidth="1.5"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                    height="20"
-                    width="20"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
-                    ></path>
-                  </svg>
-                </div>
-              </span>
-              <p className="leading-relaxed">
-                <span className="block font-bold text-gray-700">AI </span>Hi,
-                how can I help you today?
-              </p>
-            </div>
-
-            {/* User Chat Message */}
-            <div className="flex gap-3 my-4 text-gray-600 text-sm flex-1">
-              <span className="relative flex shrink-0 overflow-hidden rounded-full w-8 h-8">
-                <div className="rounded-full bg-gray-100 border p-1">
-                  <svg
-                    stroke="none"
-                    fill="black"
-                    strokeWidth="0"
-                    viewBox="0 0 16 16"
-                    height="20"
-                    width="20"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4Zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10Z"></path>
-                  </svg>
-                </div>
-              </span>
-              <p className="leading-relaxed">
-                <span className="block font-bold text-gray-700">You </span>
-                fewafef
-              </p>
-            </div>
-
-            {/* AI Chat Message */}
-            <div className="flex gap-3 my-4 text-gray-600 text-sm flex-1">
-              <span className="relative flex shrink-0 overflow-hidden rounded-full w-8 h-8">
-                <div className="rounded-full bg-gray-100 border p-1">
-                  <svg
-                    stroke="none"
-                    fill="black"
-                    strokeWidth="1.5"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                    height="20"
-                    width="20"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
-                    ></path>
-                  </svg>
-                </div>
-              </span>
-              <p className="leading-relaxed">
-                <span className="block font-bold text-gray-700">AI </span>
-                Hi there! How can I assist you today?
-              </p>
-            </div>
+            {chatHistory.map((chat, index) => (
+              <div
+                key={index}
+                className={`flex gap-3 my-4 text-sm flex-1 ${
+                  chat.type === "user"
+                    ? "flex-row-reverse text-black"
+                    : "text-gray-600"
+                }`}
+              >
+                <span className="relative flex shrink-0 overflow-hidden rounded-full w-8 h-8">
+                  <div className="rounded-full bg-gray-100 border p-1">
+                    {chat.type === "user" ? (
+                      <svg
+                        stroke="none"
+                        fill="black"
+                        strokeWidth="0"
+                        viewBox="0 0 16 16"
+                        height="20"
+                        width="20"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path>
+                        <path d="M8 9a7 7 0 0 0-5.468 2.635c.274 2.282 4.694 2.365 5.468 2.365s5.193-.083 5.468-2.365A7 7 0 0 0 8 9z"></path>
+                      </svg>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="feather feather-robot"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="8"
+                          fill="#f0f0f0"
+                          stroke="black"
+                          strokeWidth="2"
+                        />
+                        <circle cx="9" cy="10" r="1.5" fill="black" />
+                        <circle cx="15" cy="10" r="1.5" fill="black" />
+                        <line
+                          x1="12"
+                          y1="3"
+                          x2="12"
+                          y2="7"
+                          stroke="black"
+                          strokeWidth="2"
+                        />
+                        <circle cx="12" cy="3" r="1" fill="black" />
+                        <path
+                          d="M9 15c1 1 2 1 3 1s2 0 3-1"
+                          stroke="black"
+                          strokeWidth="2"
+                          fill="none"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                </span>
+                <p
+                  className={`leading-5 border border-[#e5e7eb] rounded-md p-4 bg-gray-50 py-1 px-2 ${
+                    chat.type === "user" ? "text-black" : "text-gray-600"
+                  }`}
+                >
+                  {chat.text}
+                </p>
+              </div>
+            ))}
+            <div ref={endOfMessagesRef} />
           </div>
 
-          {/* Input Section */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault(); // Prevent form submission
-              if (!isTyping) handleSendMessage(); // Handle sending the message
-            }}
-          >
-            <div className="flex items-center gap-2 w-full">
-              <div className="flex-1 pr-2">
+          {/* Audio Mode Toggle */}
+          <div className="flex items-center my-4 absolute left-0 bottom-[60px] ml-4">
+            <label
+              htmlFor="responseMode"
+              className="mr-2 text-sm font-medium text-gray-700"
+            >
+              Response Mode:
+            </label>
+            <button
+              id="responseMode"
+              className="px-3 py-1 rounded-full border border-gray-300 bg-gray-200 text-gray-700 hover:bg-gray-300 transition duration-200"
+              onClick={toggleResponseMode}
+            >
+              {responseMode === "text" ? "Text" : "Audio"}
+            </button>
+          </div>
+
+          {/* Model Selection Dropdown */}
+          <div className="absolute top-[42px] right-0 mr-[30px]">
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="bg-white border border-gray-300 rounded px-3 py-1"
+            >
+              {models.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Form Input */}
+          {isLoading ? (
+            <form
+              onSubmit={handleSendMessage}
+              className="flex items-center space-x-2"
+            >
+              <input
+                type="text"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="block w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm outline-none"
+                placeholder="Loading model, please wait..."
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                className={`inline-flex px-2 items-center justify-center text-sm font-medium rounded-md h-9 ${
+                  listening ? "bg-red-500 animate-pulse" : "bg-black"
+                } text-white m-0 p-0 normal-case leading-5 border border-transparent hover:bg-${
+                  listening ? "red-600" : "#0d0d0d"
+                } focus:outline-none disabled:pointer-events-none disabled:opacity-50`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="white"
+                  className="h-5 w-5"
+                  version="1.1"
+                  viewBox="0 0 512 512"
+                  enableBackground="new 0 0 512 512"
+                >
+                  <g>
+                    <g>
+                      <path
+                        d="m439.5,236c0-11.3-9.1-20.4-20.4-20.4s-20.4,9.1-20.4,20.4c0,70-64,126.9-142.7,126.9-78.7,0-142.7-56.9-142.7-126.9 0-11.3-9.1-20.4-20.4-20.4s-20.4,9.1-20.4,20.4c0,86.2 71.5,157.4 163.1,166.7v57.5h-23.6c-11.3,0-20.4,9.1-20.4,20.4 0,11.3 9.1,20.4 20.4,20.4h88c11.3,0 20.4-9.1 20.4-20.4 0-11.3-9.1-20.4-20.4-20.4h-23.6v-57.5c91.6-9.3 163.1-80.5 163.1-166.7z"
+                        fill="white"
+                      />
+                      <path
+                        d="m256,323.5c51,0 92.3-41.3 92.3-92.3v-127.9c0-51-41.3-92.3-92.3-92.3s-92.3,41.3-92.3,92.3v127.9c0,51 41.3,92.3 92.3,92.3zm-52.3-220.2c0-28.8 23.5-52.3 52.3-52.3s52.3,23.5 52.3,52.3v127.9c0,28.8-23.5,52.3-52.3,52.3s-52.3-23.5-52.3-52.3v-127.9z"
+                        fill="white"
+                      />
+                    </g>
+                  </g>
+                </svg>
+              </button>
+              <button
+                type="submit"
+                className="inline-flex items-center cursor-pointer justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-black"
+                disabled={isLoading}
+              >
+                Send
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleSendMessage}>
+              <div className="flex items-center space-x-2">
                 <input
-                  className="flex h-9 w-full rounded-md border bg-white px-3 py-1 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="Send a message"
                   type="text"
                   value={message}
-                  onChange={(e) => {
-                    setMessage(e.target.value);
-                    setIsTyping(true); // Set typing status
-                  }}
-                  onBlur={() => setIsTyping(false)} // Clear typing status on blur
+                  onChange={(e) => setMessage(e.target.value)}
+                  // className="block w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm outline-none"
+                  className={`block w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm outline-none ${
+                    loading ? "color-gray-300 animate-pulse" : "color-black"
+                  }`}
+                  placeholder="Type your message..."
                   disabled={loading}
                 />
-              </div>
-              <div className="flex gap-1">
-                {/* Microphone/Stop Button */}
                 <button
+                  type="button"
                   className={`inline-flex px-2 items-center justify-center text-sm font-medium rounded-md h-9 ${
                     listening ? "bg-red-500 animate-pulse" : "bg-black"
                   } text-white m-0 p-0 normal-case leading-5 border border-transparent hover:bg-${
                     listening ? "red-600" : "#0d0d0d"
                   } focus:outline-none disabled:pointer-events-none disabled:opacity-50`}
-                  type="button"
                   onClick={handleStartListening}
-                  disabled={loading}
                 >
                   {listening ? (
-                    // Stop Icon
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-5 w-5"
@@ -260,10 +442,9 @@ const Chatbot = () => {
                       />
                     </svg>
                   ) : (
-                    // Microphone Icon
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      fill="#000000"
+                      fill="white"
                       className="h-5 w-5"
                       version="1.1"
                       viewBox="0 0 512 512"
@@ -284,18 +465,39 @@ const Chatbot = () => {
                     </svg>
                   )}
                 </button>
-
-                {/* Send Button */}
                 <button
-                  className="inline-flex items-center px-2 justify-center text-sm font-medium rounded-md h-9 bg-black text-white m-0 p-0 normal-case leading-5 border border-transparent hover:bg-[#0d0d0d] focus:outline-none disabled:pointer-events-none disabled:opacity-50"
                   type="submit"
-                  disabled={loading}
+                  className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-black hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
+                  disabled={loading || listening}
                 >
-                  {loading ? "Sending..." : "Send"}
+                  {loading ? (
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      ></path>
+                    </svg>
+                  ) : (
+                    "Send"
+                  )}
                 </button>
               </div>
-            </div>
-          </form>
+            </form>
+          )}
         </div>
       )}
     </div>
