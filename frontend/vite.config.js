@@ -1,4 +1,4 @@
-import { viteConfig } from "vite";
+import viteConfig from "vite";
 
 export default viteConfig({
   plugins: [
