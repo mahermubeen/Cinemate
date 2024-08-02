@@ -2,6 +2,8 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import axios from "axios";
 
+axios.baseURL = "https://cinemate-eta.vercel.app";
+
 // Create a Zustand store
 export const useBotStore = create((set) => ({
   // Initial state
