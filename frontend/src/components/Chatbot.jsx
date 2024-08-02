@@ -17,6 +17,7 @@ const Chatbot = () => {
   const [chatHistory, setChatHistory] = useState([]); // Array to store chat messages
   const [voiceGender, setVoiceGender] = useState("male"); // Array to store chat messages
   const chatboxRef = useRef(null); // Reference to the chatbox element
+  const buttonRef = useRef(null);
 
   useEffect(() => {
     // Scroll to the bottom of the chat history whenever chatHistory changes
@@ -102,7 +103,12 @@ const Chatbot = () => {
   // Close chatbox on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (chatboxRef.current && !chatboxRef.current.contains(event.target)) {
+      if (
+        chatboxRef.current &&
+        !chatboxRef.current.contains(event.target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target)
+      ) {
         setChatboxOpen(false);
       }
     };
@@ -175,8 +181,9 @@ const Chatbot = () => {
     }
   };
 
+  // Function to handle opening and closing the chatbox
   const toggleChatbox = () => {
-    setChatboxOpen(!chatboxOpen);
+    setChatboxOpen((prevState) => !prevState);
   };
 
   const handleStartListening = () => {
@@ -197,6 +204,7 @@ const Chatbot = () => {
         className="fixed z-20 bottom-4 right-4 inline-flex items-center justify-center text-sm font-medium disabled:pointer-events-none disabled:opacity-50 border rounded-full w-16 h-16 bg-black hover:bg-gray-700 m-0 cursor-pointer border-gray-200 bg-none p-0 normal-case leading-5 hover:text-gray-900"
         type="button"
         aria-haspopup="dialog"
+        ref={buttonRef}
         aria-expanded={chatboxOpen}
         onClick={toggleChatbox}
       >
