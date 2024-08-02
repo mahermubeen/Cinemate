@@ -18,7 +18,7 @@ const PORT = ENV_VARS.PORT || 3000;
 
 const __dirname = path.resolve();
 
-app.use(express.json()); // Allow parsing of req.body
+app.use(express.json());
 app.use(cookieParser());
 
 app.use("/api/v1", botRoutes);
@@ -29,8 +29,10 @@ app.use("/api/v1/search", protectRoute, searchRoutes);
 
 // Serve static files in production
 if (ENV_VARS.NODE_ENV === "production") {
+  // Serve static files from the 'frontend/dist' directory
   app.use(express.static(path.join(__dirname, "frontend", "dist")));
 
+  // Serve the main HTML file for any route not matched by the static files
   app.get("*", (req, res) => {
     res.sendFile(path.resolve(__dirname, "frontend", "dist", "index.html"));
   });
