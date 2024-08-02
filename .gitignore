@@ -1,5 +1,4 @@
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,23 +6,32 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Dependency directories
+node_modules/
 
-.env
+# Build output directories
+dist/
+dist-ssr/
 
 # Vite build output
-/public
+/public/
+
+# Environment files
+.env
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+.vscode/
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Exclude other files and directories
+*.local
+
+# Custom build output (update if needed)
+frontend/dist/
+backend/api/output/ # Add if you have specific build outputs here
