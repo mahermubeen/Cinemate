@@ -1,35 +1,19 @@
-import viteConfig from "vite";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
-export default viteConfig({
-  plugins: [
-    {
-      name: "react",
-      configure: (config) => {
-        config.plugins.push({
-          name: "react",
-          setup: (build) => {
-            build.rollupOptions.plugins.push({
-              name: "react",
-              resolveId: (source, importer) => {
-                if (source === "react") {
-                  return {
-                    id: "react",
-                    external: true,
-                  };
-                }
-                return null;
-              },
-            });
-          },
-        });
-      },
-    },
-  ],
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: "../public",
+  },
   server: {
     proxy: {
       "/api": {
         target: "http://localhost:3000",
       },
     },
+  },
+  optimizeDeps: {
+    include: ["regenerator-runtime/runtime"],
   },
 });
