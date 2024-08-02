@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
     define: {
       "process.env": {
         API_BASE_URL: isProduction
-          ? "https://cinemate-o5aljq9g7-mubeen-ahmads-projects-12370682.vercel.app"
+          ? "https://cinemate-eta.vercel.app"
           : "http://localhost:3000",
       },
     },
