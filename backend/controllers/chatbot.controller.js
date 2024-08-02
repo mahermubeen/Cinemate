@@ -119,6 +119,11 @@ async function loadModel() {
 }
 
 export async function modelStatus(req, res) {
+  res.set({
+    "Cache-Control": "no-cache", // Prevent caching
+    Pragma: "no-cache", // HTTP/1.0 backward compatibility
+    Expires: "0", // Expiry immediately
+  });
   res.json({ ready: modelLoaded });
 }
 
