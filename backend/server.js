@@ -26,15 +26,11 @@ app.use("/api/v1/movie", protectRoute, movieRoutes);
 app.use("/api/v1/tv", protectRoute, tvRoutes);
 app.use("/api/v1/search", protectRoute, searchRoutes);
 
-// Serve frontend from the 'frontend/dist' directory
 if (process.env.NODE_ENV === "production") {
-  // Correctly resolve the path to the static files
   const __dirname = path.resolve();
 
-  // Use express.static to serve static files
   app.use(express.static(path.join(__dirname, "frontend", "dist")));
 
-  // Serve the index.html file for all unmatched routes
   app.get("*", (req, res) => {
     res.sendFile(path.resolve(__dirname, "frontend", "dist", "index.html"));
   });
