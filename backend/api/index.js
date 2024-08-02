@@ -1,7 +1,6 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import path from "path";
-import cors from "cors"; // Import the cors package
 
 import botRoutes from "../routes/chatbot.route.js";
 import authRoutes from "../routes/auth.route.js";
@@ -14,15 +13,6 @@ import { connectDB } from "../config/db.js";
 import { protectRoute } from "../middleware/protectRoute.js";
 
 const app = express();
-
-// CORS configuration
-const corsOptions = {
-  origin: "https://cinemate-eta.vercel.app", // Replace with your frontend URL
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true, // Allow credentials (like cookies) to be sent
-};
-
-app.use(cors(corsOptions)); // Use CORS middleware
 
 const PORT = ENV_VARS.PORT || 3000;
 
@@ -38,7 +28,7 @@ app.use("/api/v1/tv", protectRoute, tvRoutes);
 app.use("/api/v1/search", protectRoute, searchRoutes);
 
 // Serve static files in production
-if (process.env.NODE_ENV === "production") {
+if (ENV_VARS.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "frontend", "dist")));
 
   app.get("*", (req, res) => {
